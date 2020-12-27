@@ -7,7 +7,9 @@ import pprint
 import operator
 import datetime
 from praw.models import MoreComments
-from iexfinance import Stock as IEXStock
+from iexfinance.stocks import Stock as IEXStock
+from bs4 import BeautifulSoup
+import requests
 
 # to add the path for Python to search for files to use my edited version of vaderSentiment
 sys.path.insert(0, 'vaderSentiment/vaderSentiment')
@@ -47,7 +49,7 @@ def parse_section(ticker_dict, body):
       "OP", "DJIA", "PS", "AH", "TL", "DR", "JAN", "FEB", "JUL", "AUG",
       "SEP", "SEPT", "OCT", "NOV", "DEC", "FDA", "IV", "ER", "IPO", "RISE"
       "IPA", "URL", "MILF", "BUT", "SSN", "FIFA", "USD", "CPU", "AT",
-      "GG", "ELON"
+      "GG", "ELON", "TLDR", "COVID", "TO", "THIS", "RH"
    ]
 
    if '$' in body:
@@ -58,7 +60,7 @@ def parse_section(ticker_dict, body):
          try:
             # special case for $ROPE
             if word != "ROPE":
-               price = IEXStock(word).get_price()
+               # price = IEXStock(word, token='pk_9097764aef964f45a1ce702d8e8a8113').get_price()
                if word in ticker_dict:
                   ticker_dict[word].count += 1
                   ticker_dict[word].bodies.append(body)
@@ -66,8 +68,10 @@ def parse_section(ticker_dict, body):
                   ticker_dict[word] = Ticker(word)
                   ticker_dict[word].count = 1
                   ticker_dict[word].bodies.append(body)
-         except:
-            pass
+         except Exception as e:
+         	print(type(e), e)
+         	print(f'\nError in parse_section! Word is {word}')
+            # pass
    
    # checks for non-$ formatted comments, splits every body into list of words
    word_list = re.sub("[^\w]", " ",  body).split()
@@ -76,12 +80,12 @@ def parse_section(ticker_dict, body):
       if word.isupper() and len(word) != 1 and (word.upper() not in blacklist_words) and len(word) <= 5 and word.isalpha():
          # sends request to IEX API to determine whether the current word is a valid ticker
          # if it isn't, it'll return an error and therefore continue on to the next word
-         try:
-            # special case for $ROPE
-            if word != "ROPE":
-               price = IEXStock(word).get_price()
-         except:
-            continue
+         # try:
+         #    # special case for $ROPE
+         #    if word != "ROPE":
+         #       price = IEXStock(word, token='pk_9097764aef964f45a1ce702d8e8a8113').get_price()
+         # except:
+         #    continue
       
          # add/adjust value of dictionary
          if word in ticker_dict:
@@ -103,12 +107,12 @@ def get_url(key, value, total_count):
          perc_mentions = int(value / total_count * 100)
    # special case for $ROPE
    if key == "ROPE":
-      return "${0} | [{1} {2} ({3}% of all mentions)](https://www.homedepot.com/b/Hardware-Chains-Ropes-Rope/N-5yc1vZc2gr)".format(key, value, mention, perc_mentions)
+      return f"${key} | [{value} {mention} ({perc_mentions}% of all mentions)](https://www.homedepot.com/b/Hardware-Chains-Ropes-Rope/N-5yc1vZc2gr)"
    else:
-      return "${0} | [{1} {2} ({3}% of all mentions)](https://finance.yahoo.com/quote/{0}?p={0})".format(key, value, mention, perc_mentions)
+      return f"${key} | [{value} {mention} ({perc_mentions}% of all mentions)](https://finance.yahoo.com/quote/{key}?p={key})"
 
 def final_post(subreddit, text):
-   # finding the daily discussino thread to post
+   # finding the daily discussion thread to post
    title = str(get_date()) + " | Today's Top 25 WSB Tickers"
 
    print("\nPosting...")
@@ -155,7 +159,7 @@ def run(mode, sub, num_submissions):
             if not within24_hrs:
                within24_hrs = True
             else:
-               print("\nTotal posts searched: " + str(count) + "\nTotal ticker mentions: " + str(total_count))
+               print(f"\nTotal posts searched: {str(count)}\nTotal ticker mentions: {str(total_count)}")
                break
          
          # search through all comments and replies to comments
@@ -175,7 +179,7 @@ def run(mode, sub, num_submissions):
                ticker_dict = parse_section(ticker_dict, rep.body)
          
          # update the progress count
-         sys.stdout.write("\rProgress: {0} / {1} posts".format(count + 1, num_submissions))
+         sys.stdout.write(f"\rProgress: {count+1} / {num_submissions} posts")
          sys.stdout.flush()
 
    text = "To help you YOLO your money away, here are all of the tickers mentioned at least 10 times in all the posts within the past 24 hours (and links to their Yahoo Finance page) along with a sentiment analysis percentage:"
@@ -200,7 +204,7 @@ def run(mode, sub, num_submissions):
       
       url = get_url(ticker.ticker, ticker.count, total_mentions)
       # setting up formatting for table
-      text += "\n{} | {} | {} | {}".format(url, ticker.bullish, ticker.bearish, ticker.neutral)
+      text += f"\n{url} | {ticker.bullish} | {ticker.bearish} | {ticker.neutral}"
 
    text += "\n\nTake a look at my [source code](https://github.com/RyanElliott10/wsbtickerbot) and make some contributions if you're interested."
 
@@ -242,7 +246,7 @@ class Ticker:
 
 if __name__ == "__main__":
    # USAGE: wsbtickerbot.py [ subreddit ] [ num_submissions ]
-   mode = 0
+   mode = 1
    num_submissions = 500
    sub = "wallstreetbets"
 

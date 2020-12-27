@@ -74,7 +74,7 @@ BOOSTER_DICT = \
      "sort of": B_DECR, "sorta": B_DECR, "sortof": B_DECR, "sort-of": B_DECR,
      
     # my edits to decreased
-     "rip": B_INCR, "loses": B_INCR, "loss": B_INCR, "short": B_INCR
+     "rip": B_DECR, "loses": B_DECR, "loss": B_DECR, "short": B_DECR, "losses": B_DECR
      }
 
 # check for sentiment laden idioms that do not contain lexicon words (future work, not yet implemented)
@@ -89,7 +89,7 @@ SPECIAL_CASE_IDIOMS = {"the shit": 3, "the bomb": 3, "bad ass": 1.5, "yeah right
                        "kiss of death": -1.5,
                        
                         # my edits
-                        "to the moon": 3}
+                        "to the moon": 3, "badass": 1.5, "bad-ass": 1.5}
 
 
 # #Static methods# #
