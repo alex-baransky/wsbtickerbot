@@ -18,6 +18,22 @@ from datetime import datetime
 sys.path.insert(0, 'vaderSentiment/vaderSentiment')
 from vaderSentiment import SentimentIntensityAnalyzer
 
+blacklist_words = [
+      "YOLO", "TOS", "CEO", "CFO", "CTO", "DD", "BTFD", "WSB", "OK", "RH",
+      "KYS", "FD", "TYS", "US", "USA", "IT", "ATH", "RIP", "BMW", "GDP",
+      "OTM", "ATM", "ITM", "IMO", "LOL", "DOJ", "BE", "PR", "PC", "ICE",
+      "TYS", "ISIS", "PRAY", "PT", "FBI", "SEC", "GOD", "NOT", "POS", "COD",
+      "AYYMD", "FOMO", "TL;DR", "EDIT", "STILL", "LGMA", "WTF", "RAW", "PM",
+      "LMAO", "LMFAO", "ROFL", "EZ", "RED", "BEZOS", "TICK", "IS", "DOW"
+      "AM", "PM", "LPT", "GOAT", "FL", "CA", "IL", "PDFUA", "MACD", "HQ",
+      "OP", "DJIA", "PS", "AH", "TL", "DR", "JAN", "FEB", "JUL", "AUG",
+      "SEP", "SEPT", "OCT", "NOV", "DEC", "FDA", "IV", "ER", "IPO", "RISE"
+      "IPA", "URL", "MILF", "BUT", "SSN", "FIFA", "USD", "CPU", "AT",
+      "GG", "ELON"
+    ]
+
+blacklist_words = dict.fromkeys(blacklist_words, 1)
+
 def get_valid_symbols():
 	"""
 	Utilizes nasdaq FTP server to find valid ticker symbols. Returns
@@ -95,24 +111,12 @@ def extract_ticker(body, start_index):
 
 def parse_section(ticker_dict, body):
 	""" Parses the body of each comment/reply """
-	blacklist_words = [
-      "YOLO", "TOS", "CEO", "CFO", "CTO", "DD", "BTFD", "WSB", "OK", "RH",
-      "KYS", "FD", "TYS", "US", "USA", "IT", "ATH", "RIP", "BMW", "GDP",
-      "OTM", "ATM", "ITM", "IMO", "LOL", "DOJ", "BE", "PR", "PC", "ICE",
-      "TYS", "ISIS", "PRAY", "PT", "FBI", "SEC", "GOD", "NOT", "POS", "COD",
-      "AYYMD", "FOMO", "TL;DR", "EDIT", "STILL", "LGMA", "WTF", "RAW", "PM",
-      "LMAO", "LMFAO", "ROFL", "EZ", "RED", "BEZOS", "TICK", "IS", "DOW"
-      "AM", "PM", "LPT", "GOAT", "FL", "CA", "IL", "PDFUA", "MACD", "HQ",
-      "OP", "DJIA", "PS", "AH", "TL", "DR", "JAN", "FEB", "JUL", "AUG",
-      "SEP", "SEPT", "OCT", "NOV", "DEC", "FDA", "IV", "ER", "IPO", "RISE"
-      "IPA", "URL", "MILF", "BUT", "SSN", "FIFA", "USD", "CPU", "AT",
-      "GG", "ELON"
-    ]
+
 	if '$' in body:
 		index = body.find('$') + 1
 		word = extract_ticker(body, index)
 	  
-		if word and (word in valid_symbols) and (word not in blacklist_words):
+		if word and (word not in blacklist_words):
 			try:
 				if word in ticker_dict:
 					ticker_dict[word].count += 1
@@ -121,13 +125,13 @@ def parse_section(ticker_dict, body):
 					ticker_dict[word] = Ticker(word)
 					ticker_dict[word].count = 1
 					ticker_dict[word].bodies.append(body)
-					price_info = get_price_info(word)
+					# price_info = get_price_info(word)
 			   
-					if price_info:
-						ticker_dict[word].price = price_info[0]
-						ticker_dict[word].price_change_net = price_info[1]
-						ticker_dict[word].price_change_pct = price_info[2]
-						ticker_dict[word].price_time = price_info[3]
+					# if price_info:
+					# 	ticker_dict[word].price = price_info[0]
+					# 	ticker_dict[word].price_change_net = price_info[1]
+					# 	ticker_dict[word].price_change_pct = price_info[2]
+					# 	ticker_dict[word].price_time = price_info[3]
 					
 			except Exception as e:
 				print()
@@ -142,15 +146,15 @@ def parse_section(ticker_dict, body):
 		if word.isupper() and len(word) != 1 and (word in valid_symbols) and len(word) <= 5 and word.isalpha() and (word not in blacklist_words):
 			# Use BeautifulSoup to scrape Yahoo stock page to see if ticker is valid,
 			# if not then continue to next word.
-			try:
-				price_info = get_price_info(word)
-			except Exception as e:
-				print(f'\n{type(e)} {e}')
-				print(word)
-				continue
+			# try:
+			# 	price_info = get_price_info(word)
+			# except Exception as e:
+			# 	print(f'\n{type(e)} {e}')
+			# 	print(word)
+			# 	continue
 		 
-			if not price_info:
-				continue
+			# if not price_info:
+			# 	continue
 	  
 			# add/adjust value of dictionary
 			if word in ticker_dict:
@@ -160,10 +164,10 @@ def parse_section(ticker_dict, body):
 				ticker_dict[word] = Ticker(word)
 				ticker_dict[word].count = 1
 				ticker_dict[word].bodies.append(body)
-				ticker_dict[word].price = price_info[0]
-				ticker_dict[word].price_change_net = price_info[1]
-				ticker_dict[word].price_change_pct = price_info[2]
-				ticker_dict[word].price_time = price_info[3]
+				# ticker_dict[word].price = price_info[0]
+				# ticker_dict[word].price_change_net = price_info[1]
+				# ticker_dict[word].price_change_pct = price_info[2]
+				# ticker_dict[word].price_time = price_info[3]
 			
 	return ticker_dict
 
@@ -174,8 +178,8 @@ def get_url(key, value, total_count):
 			perc_mentions = "<1"
 	else:
 			perc_mentions = int(value / total_count * 100)
-		 
-	return f"${key} | [{value} {mention} ({perc_mentions}% of all mentions)](https://finance.yahoo.com/quote/{key}?p={key})"
+
+	return f"$[{key}](https://finance.yahoo.com/quote/{key}?p={key}) | {value} {mention} ({perc_mentions}% of all mentions)"
 
 def final_post(subreddit, text):
 	# finding the daily discussion thread to post
