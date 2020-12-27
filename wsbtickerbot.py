@@ -1,3 +1,4 @@
+import os
 import re
 import sys
 import praw
@@ -15,6 +16,11 @@ import requests
 sys.path.insert(0, 'vaderSentiment/vaderSentiment')
 from vaderSentiment import SentimentIntensityAnalyzer
 
+# This is a really long command, but it will retrieve all the 
+ticker_cmd = 'echo "[\"$(echo -n "$(echo -en "$(curl -s --compressed \'ftp://ftp.nasdaqtrader.com/SymbolDirectory/nasdaqlisted.txt\' | tail -n+2 | head -n-1 | perl -pe \'s/ //g\' | tr \'|\' \' \' | awk \'{printf $1" "} {print $4}\')\n$(curl -s --compressed \'ftp://ftp.nasdaqtrader.com/SymbolDirectory/otherlisted.txt\' | tail -n+2 | head -n-1 | perl -pe \'s/ //g\' | tr \'|\' \' \' | awk \'{printf $1" "} {print $7}\')" | grep -v \'Y$\' | awk \'{print $1}\' | grep -v \'[^a-zA-Z]\' | sort)" | perl -pe \'s/\n/","/g\')\"]'
+ticker_list = list(filter(lambda s: len(s) > 1, os.system(ticker_cmd)))
+existing_ticker_dict = dict.fromKeys(ticker_list, 1)
+
 def get_price_info(ticker):
 	"""
 	Given a ticker string, scrape the Yahoo ticker page to get the price,
@@ -23,16 +29,20 @@ def get_price_info(ticker):
 	response = requests.get(f'https://finance.yahoo.com/quote/{ticker}?p={ticker}')
 	text = BeautifulSoup(response.text, 'html.parser')
 	
-	prices = text.find('div', attrs={'data-reactid': '49'}).find_all('span')
+	exists = text.find('div', attrs={'class': 'D(ib) Mend(20px)'})
+
+	if not exists:
+		return None
+	
+	prices = exists.find_all('span')
 	prices = [val.string for val in prices]
 
-	if prices[0]:
-		prices = [val.string for val in prices]
+	try:
 		price_change_net, price_change_pct = prices[1].replace('(', '').replace(')', '').split()
-		
-		return [prices[0], price_change_net, price_change_pct, prices[2]]
-	else:
-		return None
+	except:
+		print(f'The replace error string is: {prices[1]}')
+	
+	return [prices[0], price_change_net, price_change_pct, prices[2]]
 
 def extract_ticker(body, start_index):
 	"""
@@ -69,13 +79,14 @@ def parse_section(ticker_dict, body):
 		"SEP", "SEPT", "OCT", "NOV", "DEC", "FDA", "IV", "ER", "IPO", "RISE"
 		"IPA", "URL", "MILF", "BUT", "SSN", "FIFA", "USD", "CPU", "AT",
 		"GG", "ELON", "TLDR", "COVID", "TO", "THIS", "RH", "ETF", "THE",
-		"AND", "SPAC", "IRA", "EV", "ROPE"
+		"AND", "SPAC", "IRA", "EV", "ROPE", "OTC", "PP", "CALL", "MODS",
+		"POP", "BS", "ROI"
 	]
 
 	if '$' in body:
 		index = body.find('$') + 1
 		word = extract_ticker(body, index)
-      
+	  
 		if word and word not in blacklist_words:
 			try:
 				if word in ticker_dict:
@@ -86,14 +97,15 @@ def parse_section(ticker_dict, body):
 					ticker_dict[word].count = 1
 					ticker_dict[word].bodies.append(body)
 					price_info = get_price_info(word)
-               
+			   
 					if price_info:
 						ticker_dict[word].price = price_info[0]
 						ticker_dict[word].price_change_net = price_info[1]
 						ticker_dict[word].price_change_pct = price_info[2]
 						ticker_dict[word].price_time = price_info[3]
-                  	
+					
 			except Exception as e:
+				print()
 				print(type(e), e)
 				print(f'\nError in parse_section! Word is {word}')
 				# pass
@@ -107,13 +119,14 @@ def parse_section(ticker_dict, body):
 			# if not then continue to next word.
 			try:
 				price_info = get_price_info(word)
-			except:
+			except Exception as e:
+				print(f'\n{type(e)} {e}')
 				print(word)
 				continue
-         
+		 
 			if not price_info:
 				continue
-      
+	  
 			# add/adjust value of dictionary
 			if word in ticker_dict:
 				ticker_dict[word].count += 1
@@ -126,7 +139,7 @@ def parse_section(ticker_dict, body):
 				ticker_dict[word].price_change_net = price_info[1]
 				ticker_dict[word].price_change_pct = price_info[2]
 				ticker_dict[word].price_time = price_info[3]
-            
+			
 	return ticker_dict
 
 def get_url(key, value, total_count):
@@ -136,7 +149,7 @@ def get_url(key, value, total_count):
 			perc_mentions = "<1"
 	else:
 			perc_mentions = int(value / total_count * 100)
-         
+		 
 	return f"${key} | [{value} {mention} ({perc_mentions}% of all mentions)](https://finance.yahoo.com/quote/{key}?p={key})"
 
 def final_post(subreddit, text):
@@ -188,7 +201,7 @@ def run(mode, sub, num_submissions):
 				else:
 					print(f"\nTotal posts searched: {str(count)}\nTotal ticker mentions: {str(total_count)}")
 					break
-         
+		 
 			# search through all comments and replies to comments
 			comments = post.comments
 			for comment in comments:
@@ -204,7 +217,7 @@ def run(mode, sub, num_submissions):
 					if isinstance(rep, MoreComments):
 						continue
 					ticker_dict = parse_section(ticker_dict, rep.body)
-         
+		 
 			# update the progress count
 			sys.stdout.write(f"\rProgress: {count+1} / {num_submissions} posts")
 			sys.stdout.flush()
@@ -228,7 +241,7 @@ def run(mode, sub, num_submissions):
 	for count, ticker in enumerate(ticker_list):
 		if count == 25:
 			break
-      
+	  
 		url = get_url(ticker.ticker, ticker.count, total_mentions)
 		# setting up formatting for table
 		text += f"\n{url} | {ticker.price} | {ticker.price_change_net}/{ticker.price_change_pct} | {ticker.bullish} | {ticker.bearish} | {ticker.neutral}"
