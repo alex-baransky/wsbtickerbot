@@ -12,6 +12,7 @@ from praw.models import MoreComments
 from bs4 import BeautifulSoup
 import requests
 import pandas as pd
+from datetime import datetime
 
 # to add the path for Python to search for files to use my edited version of vaderSentiment
 sys.path.insert(0, 'vaderSentiment/vaderSentiment')
@@ -322,5 +323,7 @@ if __name__ == "__main__":
 		mode = 1
 		num_submissions = int(sys.argv[2])
 
+	startTime = datetime.now()
 	valid_symbols = get_valid_symbols()
 	run(mode, sub, num_submissions)
+	print(f'It took {(datetime.now() - startTime)/60} minutes to run!')
