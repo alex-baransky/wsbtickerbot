@@ -1,4 +1,4 @@
-import os
+from ftplib import FTP
 import re
 import sys
 import praw
@@ -8,18 +8,45 @@ import pprint
 import operator
 import datetime
 from praw.models import MoreComments
-from iexfinance.stocks import Stock as IEXStock
+# from iexfinance.stocks import Stock as IEXStock
 from bs4 import BeautifulSoup
 import requests
+import pandas as pd
 
 # to add the path for Python to search for files to use my edited version of vaderSentiment
 sys.path.insert(0, 'vaderSentiment/vaderSentiment')
 from vaderSentiment import SentimentIntensityAnalyzer
 
-# This is a really long command, but it will retrieve all the 
-ticker_cmd = 'echo "[\"$(echo -n "$(echo -en "$(curl -s --compressed \'ftp://ftp.nasdaqtrader.com/SymbolDirectory/nasdaqlisted.txt\' | tail -n+2 | head -n-1 | perl -pe \'s/ //g\' | tr \'|\' \' \' | awk \'{printf $1" "} {print $4}\')\n$(curl -s --compressed \'ftp://ftp.nasdaqtrader.com/SymbolDirectory/otherlisted.txt\' | tail -n+2 | head -n-1 | perl -pe \'s/ //g\' | tr \'|\' \' \' | awk \'{printf $1" "} {print $7}\')" | grep -v \'Y$\' | awk \'{print $1}\' | grep -v \'[^a-zA-Z]\' | sort)" | perl -pe \'s/\n/","/g\')\"]'
-ticker_list = list(filter(lambda s: len(s) > 1, os.system(ticker_cmd)))
-existing_ticker_dict = dict.fromKeys(ticker_list, 1)
+def get_valid_symbols():
+	"""
+	Utilizes nasdaq FTP server to find valid ticker symbols. Returns
+	dictionary with the symbols as keys for fast symbol lookup. Dictionary
+	values are meaningless.
+	"""
+	# Log in to FTP server to get stock symbols
+	nasdaq = FTP('ftp.nasdaqtrader.com')
+	nasdaq.login()
+	nasdaq.cwd('SymbolDirectory')
+
+	# Write stock symbols to two files
+	with open('nasdaqlisted.txt', 'wb') as f:
+		nasdaq.retrbinary('RETR nasdaqlisted.txt', f.write)
+	with open('otherlisted.txt', 'wb') as f:
+		nasdaq.retrbinary('RETR otherlisted.txt', f.write)
+
+	# Open files and merge them
+	with open('nasdaqlisted.txt', 'r') as f:
+		total_stocks = f.readlines()
+	with open('otherlisted.txt', 'r') as f:
+		# Discard the header row
+		f.readline()
+		total_stocks.extend(f.readlines())
+
+	total_stocks = [line.split('|') for line in total_stocks]
+	df = pd.DataFrame(total_stocks[1:], columns=total_stocks[0])
+	valid_symbols = df['Symbol'][df['Symbol'].apply(str.isalpha)]
+	
+	return dict.fromkeys(list(valid_symbols), 1)
 
 def get_price_info(ticker):
 	"""
@@ -68,26 +95,23 @@ def extract_ticker(body, start_index):
 def parse_section(ticker_dict, body):
 	""" Parses the body of each comment/reply """
 	blacklist_words = [
-		"YOLO", "TOS", "CEO", "CFO", "CTO", "DD", "BTFD", "WSB", "OK", "RH",
-		"KYS", "FD", "TYS", "US", "USA", "IT", "ATH", "RIP", "BMW", "GDP",
-		"OTM", "ATM", "ITM", "IMO", "LOL", "DOJ", "BE", "PR", "PC", "ICE",
-		"TYS", "ISIS", "PRAY", "PT", "FBI", "SEC", "GOD", "NOT", "POS", "COD",
-		"AYYMD", "FOMO", "TL;DR", "EDIT", "STILL", "LGMA", "WTF", "RAW", "PM",
-		"LMAO", "LMFAO", "ROFL", "EZ", "RED", "BEZOS", "TICK", "IS", "DOW"
-		"AM", "PM", "LPT", "GOAT", "FL", "CA", "IL", "PDFUA", "MACD", "HQ",
-		"OP", "DJIA", "PS", "AH", "TL", "DR", "JAN", "FEB", "JUL", "AUG",
-		"SEP", "SEPT", "OCT", "NOV", "DEC", "FDA", "IV", "ER", "IPO", "RISE"
-		"IPA", "URL", "MILF", "BUT", "SSN", "FIFA", "USD", "CPU", "AT",
-		"GG", "ELON", "TLDR", "COVID", "TO", "THIS", "RH", "ETF", "THE",
-		"AND", "SPAC", "IRA", "EV", "ROPE", "OTC", "PP", "CALL", "MODS",
-		"POP", "BS", "ROI"
-	]
-
+      "YOLO", "TOS", "CEO", "CFO", "CTO", "DD", "BTFD", "WSB", "OK", "RH",
+      "KYS", "FD", "TYS", "US", "USA", "IT", "ATH", "RIP", "BMW", "GDP",
+      "OTM", "ATM", "ITM", "IMO", "LOL", "DOJ", "BE", "PR", "PC", "ICE",
+      "TYS", "ISIS", "PRAY", "PT", "FBI", "SEC", "GOD", "NOT", "POS", "COD",
+      "AYYMD", "FOMO", "TL;DR", "EDIT", "STILL", "LGMA", "WTF", "RAW", "PM",
+      "LMAO", "LMFAO", "ROFL", "EZ", "RED", "BEZOS", "TICK", "IS", "DOW"
+      "AM", "PM", "LPT", "GOAT", "FL", "CA", "IL", "PDFUA", "MACD", "HQ",
+      "OP", "DJIA", "PS", "AH", "TL", "DR", "JAN", "FEB", "JUL", "AUG",
+      "SEP", "SEPT", "OCT", "NOV", "DEC", "FDA", "IV", "ER", "IPO", "RISE"
+      "IPA", "URL", "MILF", "BUT", "SSN", "FIFA", "USD", "CPU", "AT",
+      "GG", "ELON"
+    ]
 	if '$' in body:
 		index = body.find('$') + 1
 		word = extract_ticker(body, index)
 	  
-		if word and word not in blacklist_words:
+		if word and (word in valid_symbols) and (word not in blacklist_words):
 			try:
 				if word in ticker_dict:
 					ticker_dict[word].count += 1
@@ -114,7 +138,7 @@ def parse_section(ticker_dict, body):
 	word_list = re.sub("[^\w]", " ", body).split()
 	for word in word_list:
 		# initial screening of words
-		if word.isupper() and len(word) != 1 and (word.upper() not in blacklist_words) and len(word) <= 5 and word.isalpha():
+		if word.isupper() and len(word) != 1 and (word in valid_symbols) and len(word) <= 5 and word.isalpha() and (word not in blacklist_words):
 			# Use BeautifulSoup to scrape Yahoo stock page to see if ticker is valid,
 			# if not then continue to next word.
 			try:
@@ -223,7 +247,7 @@ def run(mode, sub, num_submissions):
 			sys.stdout.flush()
 
 	text = "To help you YOLO your money away, here are all of the tickers mentioned at least 10 times in all the posts within the past 24 hours (and links to their Yahoo Finance page) along with a sentiment analysis percentage:"
-	text += "\n\nTicker | Mentions | Price | Price Change (Net/Percent) | Neutral (%) | Bearish (%)\n:- | :- | :- | :- | :- | :- | :-"
+	text += "\n\nTicker | Mentions | Price | Price Change (Net) | Price Change (%) |Neutral (%) | Bearish (%)\n:- | :- | :- | :- | :- | :- | :- | :-"
 
 	total_mentions = 0
 	ticker_list = []
@@ -244,7 +268,7 @@ def run(mode, sub, num_submissions):
 	  
 		url = get_url(ticker.ticker, ticker.count, total_mentions)
 		# setting up formatting for table
-		text += f"\n{url} | {ticker.price} | {ticker.price_change_net}/{ticker.price_change_pct} | {ticker.bullish} | {ticker.bearish} | {ticker.neutral}"
+		text += f"\n{url} | {ticker.price} | {ticker.price_change_net} | {ticker.price_change_pct} | {ticker.bullish} | {ticker.bearish} | {ticker.neutral}"
 
 	text += "\n\nCheck out the original [source code](https://github.com/RyanElliott10/wsbtickerbot) by RyanElliott10 or check out my [source code](https://github.com/alex-baransky/wsbtickerbot)."
 
@@ -298,4 +322,5 @@ if __name__ == "__main__":
 		mode = 1
 		num_submissions = int(sys.argv[2])
 
+	valid_symbols = get_valid_symbols()
 	run(mode, sub, num_submissions)
