@@ -1,0 +1,5 @@
+google-api-python-client
+praw
+ftplib
+google_auth_oauthlib
+pandas==1.1.5

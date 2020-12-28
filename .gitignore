@@ -139,7 +139,8 @@ cython_debug/
 
 # Data
 *.csv
-*.txt
+nasdaqlisted.txt
+otherlisted.txt
 /data
 
 # Credential Files
