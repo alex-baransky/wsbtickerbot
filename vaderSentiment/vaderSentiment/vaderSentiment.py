@@ -64,7 +64,8 @@ BOOSTER_DICT = \
      "very": B_INCR,
 
     #  my edits to increased
-      "bought": B_INCR, "wish me luck": B_INCR, "gains": B_INCR, "gain": B_INCR, "long": B_INCR,
+     "bought": B_INCR, "wish me luck": B_INCR, "gains": B_INCR, "gain": B_INCR, "long": B_INCR, "call": B_INCR,
+     "calls": B_INCR,
     
     # to be decreased
      "almost": B_DECR, "barely": B_DECR, "hardly": B_DECR, "just enough": B_DECR,
@@ -74,7 +75,7 @@ BOOSTER_DICT = \
      "sort of": B_DECR, "sorta": B_DECR, "sortof": B_DECR, "sort-of": B_DECR,
      
     # my edits to decreased
-     "rip": B_DECR, "loses": B_DECR, "loss": B_DECR, "short": B_DECR, "losses": B_DECR
+     "rip": B_DECR, "loses": B_DECR, "loss": B_DECR, "short": B_DECR, "losses": B_DECR, "put": B_DECR, "puts": B_DECR
      }
 
 # check for sentiment laden idioms that do not contain lexicon words (future work, not yet implemented)

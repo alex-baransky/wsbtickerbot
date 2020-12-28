@@ -6,33 +6,56 @@ import time
 import json
 import pprint
 import operator
-import datetime
+from datetime import datetime, timedelta
 from praw.models import MoreComments
-# from iexfinance.stocks import Stock as IEXStock
 from bs4 import BeautifulSoup
 import requests
 import pandas as pd
-from datetime import datetime
+import csv
 
 # to add the path for Python to search for files to use my edited version of vaderSentiment
 sys.path.insert(0, 'vaderSentiment/vaderSentiment')
 from vaderSentiment import SentimentIntensityAnalyzer
 
 blacklist_words = [
-      "YOLO", "TOS", "CEO", "CFO", "CTO", "DD", "BTFD", "WSB", "OK", "RH",
-      "KYS", "FD", "TYS", "US", "USA", "IT", "ATH", "RIP", "BMW", "GDP",
-      "OTM", "ATM", "ITM", "IMO", "LOL", "DOJ", "BE", "PR", "PC", "ICE",
-      "TYS", "ISIS", "PRAY", "PT", "FBI", "SEC", "GOD", "NOT", "POS", "COD",
-      "AYYMD", "FOMO", "TL;DR", "EDIT", "STILL", "LGMA", "WTF", "RAW", "PM",
-      "LMAO", "LMFAO", "ROFL", "EZ", "RED", "BEZOS", "TICK", "IS", "DOW"
-      "AM", "PM", "LPT", "GOAT", "FL", "CA", "IL", "PDFUA", "MACD", "HQ",
-      "OP", "DJIA", "PS", "AH", "TL", "DR", "JAN", "FEB", "JUL", "AUG",
-      "SEP", "SEPT", "OCT", "NOV", "DEC", "FDA", "IV", "ER", "IPO", "RISE"
-      "IPA", "URL", "MILF", "BUT", "SSN", "FIFA", "USD", "CPU", "AT",
-      "GG", "ELON"
-    ]
+	  "YOLO", "TOS", "CEO", "CFO", "CTO", "DD", "BTFD", "WSB", "OK", "RH",
+	  "KYS", "FD", "TYS", "US", "USA", "IT", "ATH", "RIP", "BMW", "GDP",
+	  "OTM", "ATM", "ITM", "IMO", "LOL", "DOJ", "BE", "PR", "PC", "ICE",
+	  "TYS", "ISIS", "PRAY", "PT", "FBI", "SEC", "GOD", "NOT", "POS", "COD",
+	  "AYYMD", "FOMO", "TL;DR", "EDIT", "STILL", "LGMA", "WTF", "RAW", "PM",
+	  "LMAO", "LMFAO", "ROFL", "EZ", "RED", "BEZOS", "TICK", "IS", "DOW"
+	  "AM", "PM", "LPT", "GOAT", "FL", "CA", "IL", "PDFUA", "MACD", "HQ",
+	  "OP", "DJIA", "PS", "AH", "TL", "DR", "JAN", "FEB", "JUL", "AUG",
+	  "SEP", "SEPT", "OCT", "NOV", "DEC", "FDA", "IV", "ER", "IPO", "RISE"
+	  "IPA", "URL", "MILF", "BUT", "SSN", "FIFA", "USD", "CPU", "AT",
+	  "GG", "ELON", "ROPE", "GAS", "P", "SEX", "GTFO", "BRK", "KAHOOT",
+	  "VHS"
+	]
 
 blacklist_words = dict.fromkeys(blacklist_words, 1)
+
+def print_progress_bar(iteration, total, prefix = '', suffix = '', decimals = 1, length = 50, fill = '█', printEnd = "\r"):
+    """
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        length      - Optional  : character length of bar (Int)
+        fill        - Optional  : bar fill character (Str)
+        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
+    """
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    bar = bar[:len(bar)//2] + f'{percent}%' + bar[len(bar)//2:]
+
+    print(f'\r{prefix} |{bar}| {iteration} / {total} {suffix}', end = printEnd)
+    # Print New Line on Complete
+    if iteration == total: 
+        print()
 
 def get_valid_symbols():
 	"""
@@ -72,20 +95,17 @@ def get_price_info(ticker):
 	"""
 	response = requests.get(f'https://finance.yahoo.com/quote/{ticker}?p={ticker}')
 	text = BeautifulSoup(response.text, 'html.parser')
-	
+
 	exists = text.find('div', attrs={'class': 'D(ib) Mend(20px)'})
 
 	if not exists:
 		return None
-	
+
 	prices = exists.find_all('span')
 	prices = [val.string for val in prices]
 
-	try:
-		price_change_net, price_change_pct = prices[1].replace('(', '').replace(')', '').split()
-	except:
-		print(f'The replace error string is: {prices[1]}')
-	
+	price_change_net, price_change_pct = prices[1].replace('(', '').replace(')', '').split()
+
 	return [prices[0], price_change_net, price_change_pct, prices[2]]
 
 def extract_ticker(body, start_index):
@@ -115,48 +135,8 @@ def parse_section(ticker_dict, body):
 	if '$' in body:
 		index = body.find('$') + 1
 		word = extract_ticker(body, index)
-	  
+
 		if word and (word not in blacklist_words):
-			try:
-				if word in ticker_dict:
-					ticker_dict[word].count += 1
-					ticker_dict[word].bodies.append(body)
-				else:
-					ticker_dict[word] = Ticker(word)
-					ticker_dict[word].count = 1
-					ticker_dict[word].bodies.append(body)
-					# price_info = get_price_info(word)
-			   
-					# if price_info:
-					# 	ticker_dict[word].price = price_info[0]
-					# 	ticker_dict[word].price_change_net = price_info[1]
-					# 	ticker_dict[word].price_change_pct = price_info[2]
-					# 	ticker_dict[word].price_time = price_info[3]
-					
-			except Exception as e:
-				print()
-				print(type(e), e)
-				print(f'\nError in parse_section! Word is {word}')
-				# pass
-   
-	# checks for non-$ formatted comments, splits every body into list of words
-	word_list = re.sub("[^\w]", " ", body).split()
-	for word in word_list:
-		# initial screening of words
-		if word.isupper() and len(word) != 1 and (word in valid_symbols) and len(word) <= 5 and word.isalpha() and (word not in blacklist_words):
-			# Use BeautifulSoup to scrape Yahoo stock page to see if ticker is valid,
-			# if not then continue to next word.
-			# try:
-			# 	price_info = get_price_info(word)
-			# except Exception as e:
-			# 	print(f'\n{type(e)} {e}')
-			# 	print(word)
-			# 	continue
-		 
-			# if not price_info:
-			# 	continue
-	  
-			# add/adjust value of dictionary
 			if word in ticker_dict:
 				ticker_dict[word].count += 1
 				ticker_dict[word].bodies.append(body)
@@ -164,33 +144,34 @@ def parse_section(ticker_dict, body):
 				ticker_dict[word] = Ticker(word)
 				ticker_dict[word].count = 1
 				ticker_dict[word].bodies.append(body)
-				# ticker_dict[word].price = price_info[0]
-				# ticker_dict[word].price_change_net = price_info[1]
-				# ticker_dict[word].price_change_pct = price_info[2]
-				# ticker_dict[word].price_time = price_info[3]
-			
+
+	# checks for non-$ formatted comments, splits every body into list of words
+	word_list = re.sub("[^\w]", " ", body).split()
+	for word in word_list:
+		# initial screening of words
+		if word.isupper() and len(word) != 1 and (word in valid_symbols) and len(word) <= 5 and word.isalpha() and (word not in blacklist_words):
+			if word in ticker_dict:
+				ticker_dict[word].count += 1
+				ticker_dict[word].bodies.append(body)
+			else:
+				ticker_dict[word] = Ticker(word)
+				ticker_dict[word].count = 1
+				ticker_dict[word].bodies.append(body)
+
 	return ticker_dict
 
-def get_url(key, value, total_count):
+def get_mentions(key, value, total_count):
 	# determine whether to use plural or singular
-	mention = ("mentions", "mention") [value == 1]
+	mention = ("mentions", "mention")[value == 1]
 	if int(value / total_count * 100) == 0:
-			perc_mentions = "<1"
+			pct_mentions = "<1"
 	else:
-			perc_mentions = int(value / total_count * 100)
+			pct_mentions = int(value / total_count * 100)
 
-	return f"$[{key}](https://finance.yahoo.com/quote/{key}?p={key}) | {value} {mention} ({perc_mentions}% of all mentions)"
-
-def final_post(subreddit, text):
-	# finding the daily discussion thread to post
-	title = str(get_date()) + " | Today's Top 25 WSB Tickers"
-
-	print("\nPosting...")
-	print(title)
-	subreddit.submit(title, selftext=text)
+	return value, pct_mentions
 
 def get_date():
-	now = datetime.datetime.now()
+	now = datetime.now()
 	return now.strftime("%b %d, %Y")
 
 def setup(sub):
@@ -211,26 +192,26 @@ def setup(sub):
 def run(mode, sub, num_submissions):
 	ticker_dict = {}
 	text = ""
-	total_count = 0
-	within24_hrs = False
+	total_mentions = 0
 
 	subreddit = setup(sub)
 	new_posts = subreddit.new(limit=num_submissions)
 
-	for count, post in enumerate(new_posts):
+	print('Retrieving Reddit post data...')
+	for num, post in enumerate(new_posts, 1):
 		# if we have not already viewed this post thread
 		if not post.clicked:
 			# parse the post's title's text
 			ticker_dict = parse_section(ticker_dict, post.title)
 
-			# to determine whether it has gone through all posts in the past 24 hours
-			if "Daily Discussion Thread - " in post.title:
-				if not within24_hrs:
-					within24_hrs = True
-				else:
-					print(f"\nTotal posts searched: {str(count)}\nTotal ticker mentions: {str(total_count)}")
-					break
-		 
+			# to determine whether this post is within 24 hrs
+			post_time = datetime.fromtimestamp(post.created)
+			if start_time-timedelta(hours=24) > post_time:
+				for key in ticker_dict:
+					total_mentions += ticker_dict[key].count
+				print(f"\nLess than {num_submissions} posts!\nTotal posts searched: {str(num)}\nTotal ticker mentions: {str(total_mentions)}")
+				break
+
 			# search through all comments and replies to comments
 			comments = post.comments
 			for comment in comments:
@@ -246,48 +227,58 @@ def run(mode, sub, num_submissions):
 					if isinstance(rep, MoreComments):
 						continue
 					ticker_dict = parse_section(ticker_dict, rep.body)
-		 
+
 			# update the progress count
-			sys.stdout.write(f"\rProgress: {count+1} / {num_submissions} posts")
-			sys.stdout.flush()
+			# sys.stdout.write(f"\rProgress: {count+1} / {num_submissions} posts")
+			print_progress_bar(num, num_submissions, suffix = 'posts')
+			# sys.stdout.flush()
 
-	text = "To help you YOLO your money away, here are all of the tickers mentioned at least 10 times in all the posts within the past 24 hours (and links to their Yahoo Finance page) along with a sentiment analysis percentage:"
-	text += "\n\nTicker | Mentions | Price | Price Change ($) | Price Change (%) | Bullish (%) | Neutral (%) | Bearish (%)\n:- | :- | :- | :- | :- | :- | :- | :-"
+	# Open csv file for saving and write header row
+	timestr = time.strftime("%Y%m%d")
+	csvfile = open(f'{timestr}-stonks.csv', 'w', newline='', encoding='utf-8')
+	csvwriter = csv.writer(csvfile)
+	csvwriter.writerow(['ticker', 'date', 'url', 'num_mentions', 'pct_mentions', 'pos_count',
+						'neg_count', 'bullish_pct', 'bearish_pct', 'neutral_pct', 'price', 'price_change_net',
+						'price_change_pct', 'time_of_price'])
+	# If the script didn't end early because it hit a post > 24hrs old, find total_mentions
+	if not total_mentions:
+		for key in ticker_dict:
+			total_mentions += ticker_dict[key].count
 
-	total_mentions = 0
-	ticker_list = []
-	for key in ticker_dict:
-		# print(key, ticker_dict[key].count)
-		total_mentions += ticker_dict[key].count
-		ticker_list.append(ticker_dict[key])
+	# Analyze the sentiment for each ticker, find what percentage of mentions, and find stock price info.
+	# Then write row to csv.
+	total_tickers = len(ticker_dict.keys())
+	print('\nStarting sentiment analysis, price fetching, and CSV writing...')
 
-	ticker_list = sorted(ticker_list, key=operator.attrgetter("count"), reverse=True)
+	for num, key in enumerate(ticker_dict, 1):
+		print_progress_bar(num, total_tickers, suffix = 'tickers')
+		curr_ticker = ticker_dict[key]
 
-	for ticker in ticker_list:
-		Ticker.analyze_sentiment(ticker)
+		# Scrape ticker price info. If information is not available, continue to next ticker.
+		try:
+			curr_ticker.get_price_info()
+		except Exeption as e:
+			print('\n',type(e), e)
+			print(f'Error getting price for ticker {curr_ticker.ticker}!')
+			continue
 
-	# will break as soon as it hits a ticker with fewer than 5 mentions
-	for count, ticker in enumerate(ticker_list):
-		if count == 25:
-			break
-	  
-		url = get_url(ticker.ticker, ticker.count, total_mentions)
-		# setting up formatting for table
-		text += f"\n{url} | {ticker.price} | {ticker.price_change_net} | {ticker.price_change_pct} | {ticker.bullish} | {ticker.bearish} | {ticker.neutral}"
+		# Perform sentiment analysis on text bodies for the current ticker
+		curr_ticker.analyze_sentiment()
 
-	text += "\n\nCheck out the original [source code](https://github.com/RyanElliott10/wsbtickerbot) by RyanElliott10 or check out my [source code](https://github.com/alex-baransky/wsbtickerbot)."
+		# Retrieve mentions info
+		num_mentions, pct_mentions = get_mentions(curr_ticker.ticker, curr_ticker.count, total_mentions)
 
-	# post to the subreddit if it is in bot mode (i.e. not testing)
-	if not mode:
-		final_post(subreddit, text)
-	# testing
-	else:
-		print("\nNot posting to reddit because you're in test mode\n\n*************************************************\n")
-		print(text)
+		# Write ticker data to csv row
+		csvwriter.writerow([curr_ticker.ticker, get_date(), curr_ticker.url, num_mentions, pct_mentions,
+							curr_ticker.pos_count, curr_ticker.neg_count, curr_ticker.bullish, curr_ticker.bearish, curr_ticker.neutral,
+							curr_ticker.price, curr_ticker.price_change_net, curr_ticker.price_change_pct, curr_ticker.time_of_price])
+		
+		# sys.stdout.flush()
 
 class Ticker:
 	def __init__(self, ticker):
 		self.ticker = ticker
+		self.url = f'https://finance.yahoo.com/quote/{ticker}?p={ticker}'
 		self.count = 0
 		self.bodies = []
 		self.pos_count = 0
@@ -295,11 +286,10 @@ class Ticker:
 		self.bullish = 0
 		self.bearish = 0
 		self.neutral = 0
-		self.sentiment = 0 # 0 is neutral
 		self.price = None
 		self.price_change_net = None
 		self.price_change_pct = None
-		self.price_time = None
+		self.time_of_price = None
 
 	def analyze_sentiment(self):
 		analyzer = SentimentIntensityAnalyzer()
@@ -317,6 +307,32 @@ class Ticker:
 		self.bearish = int(self.neg_count / len(self.bodies) * 100)
 		self.neutral = int(neutral_count / len(self.bodies) * 100)
 
+	def get_price_info(self):
+		"""
+		Given a ticker string, scrape the Yahoo ticker page to get the price,
+		price change (both net and percent), and time of last update.
+		"""
+		response = requests.get(f'https://finance.yahoo.com/quote/{self.ticker}?p={self.ticker}')
+		text = BeautifulSoup(response.text, 'html.parser')
+
+		exists = text.find('div', attrs={'class': 'D(ib) Mend(20px)'})
+
+		if not exists:
+			return None
+
+		prices = exists.find_all('span')
+		prices = [val.string for val in prices]
+
+		try:
+			price_change_net, price_change_pct = prices[1].replace('(', '').replace(')', '').split()
+		except:
+			raise Exception(f'Error in method get_price_info() for ticker: {self.ticker}!')
+
+		self.price = prices[0]
+		self.price_change_net = price_change_net
+		self.price_change_pct = price_change_pct
+		self.time_of_price = prices[2]
+
 if __name__ == "__main__":
 	# USAGE: wsbtickerbot.py [ subreddit ] [ num_submissions ]
 	mode = 1
@@ -327,7 +343,7 @@ if __name__ == "__main__":
 		mode = 1
 		num_submissions = int(sys.argv[2])
 
-	startTime = datetime.now()
+	start_time = datetime.now()
 	valid_symbols = get_valid_symbols()
 	run(mode, sub, num_submissions)
-	print(f'It took {(datetime.now() - startTime)/60} minutes to run!')
+	print(f'It took {(datetime.now() - start_time)/60} minutes to run!')
