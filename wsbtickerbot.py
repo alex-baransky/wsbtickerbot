@@ -33,7 +33,7 @@ blacklist_words = [
 	  "SEP", "SEPT", "OCT", "NOV", "DEC", "FDA", "IV", "ER", "IPO", "RISE"
 	  "IPA", "URL", "MILF", "BUT", "SSN", "FIFA", "USD", "CPU", "AT",
 	  "GG", "ELON", "ROPE", "GAS", "P", "SEX", "GTFO", "BRK", "KAHOOT",
-	  "VHS", "HCFC", "VIX"
+	  "VHS", "HCFC", "VIX", "BECKY", "CELG", "NIOGANG", "URSELF"
 	]
 
 blacklist_words = dict.fromkeys(blacklist_words, 1)
