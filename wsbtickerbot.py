@@ -2,6 +2,9 @@ from ftplib import FTP
 from datetime import datetime, timedelta
 from praw.models import MoreComments
 from bs4 import BeautifulSoup
+from helper import get_stonks_email_df
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 import re
 import sys
 import praw
@@ -11,6 +14,8 @@ import operator
 import requests
 import pandas as pd
 import csv
+import smtplib
+import ssl
 
 # to add the path for Python to search for files to use my edited version of vaderSentiment
 sys.path.insert(0, 'vaderSentiment/vaderSentiment')
@@ -28,7 +33,7 @@ blacklist_words = [
 	  "SEP", "SEPT", "OCT", "NOV", "DEC", "FDA", "IV", "ER", "IPO", "RISE"
 	  "IPA", "URL", "MILF", "BUT", "SSN", "FIFA", "USD", "CPU", "AT",
 	  "GG", "ELON", "ROPE", "GAS", "P", "SEX", "GTFO", "BRK", "KAHOOT",
-	  "VHS"
+	  "VHS", "HCFC", "VIX"
 	]
 
 blacklist_words = dict.fromkeys(blacklist_words, 1)
@@ -177,6 +182,7 @@ def setup(sub):
 	if sub == "":
 		sub = "wallstreetbets"
 
+	# Load Reddit API credentials (need to make this json with your own credentials)
 	with open("config.json") as json_data_file:
 		data = json.load(json_data_file)
 
@@ -188,7 +194,7 @@ def setup(sub):
 	subreddit = reddit.subreddit(sub)
 	return subreddit
 
-def run(mode, sub, num_submissions):
+def run(sub, num_submissions):
 	ticker_dict = {}
 	text = ""
 	total_mentions = 0
@@ -228,13 +234,11 @@ def run(mode, sub, num_submissions):
 					ticker_dict = parse_section(ticker_dict, rep.body)
 
 			# update the progress count
-			# sys.stdout.write(f"\rProgress: {count+1} / {num_submissions} posts")
 			print_progress_bar(num, num_submissions, suffix = 'posts')
-			# sys.stdout.flush()
 
 	# Open csv file for saving and write header row
 	timestr = time.strftime("%Y%m%d")
-	csvfile = open(f'{timestr}-stonks.csv', 'w', newline='', encoding='utf-8')
+	csvfile = open(f'./data/{timestr}-stonks.csv', 'w', newline='', encoding='utf-8')
 	csvwriter = csv.writer(csvfile)
 	csvwriter.writerow(['ticker', 'date', 'url', 'num_mentions', 'pct_mentions', 'pos_count',
 						'neg_count', 'bullish_pct', 'bearish_pct', 'neutral_pct', 'price', 'price_change_net',
@@ -256,7 +260,7 @@ def run(mode, sub, num_submissions):
 		# Scrape ticker price info. If information is not available, continue to next ticker.
 		try:
 			curr_ticker.get_price_info()
-		except Exeption as e:
+		except Exception as e:
 			print('\n',type(e), e)
 			print(f'Error getting price for ticker {curr_ticker.ticker}!')
 			continue
@@ -271,8 +275,99 @@ def run(mode, sub, num_submissions):
 		csvwriter.writerow([curr_ticker.ticker, get_date(), curr_ticker.url, num_mentions, pct_mentions,
 							curr_ticker.pos_count, curr_ticker.neg_count, curr_ticker.bullish, curr_ticker.bearish, curr_ticker.neutral,
 							curr_ticker.price, curr_ticker.price_change_net, curr_ticker.price_change_pct, curr_ticker.time_of_price])
-		
-		# sys.stdout.flush()
+
+def change_text_color(val):
+	"""
+	Changes font color to green or red, based on whether there is a positive or negative change.
+	"""
+	val = str(val)
+	if val[-1] == '%':
+		if val[0] == '-':
+			return f'<span style="color:red">{val}</span>'
+		elif val[0] == '+':
+			return f'<span style="color:green">{val}</span>'
+	else:
+		if val[0] == '-':
+			return f'<span style="color:red">{val}</span>'
+		elif float(val) != 0:
+			return f'<span style="color:green">{val}</span>'
+
+	return f'<span>{val}</span>'
+
+def find_dominant_sentiment(df):
+	"""
+	Change color and bold the value the column if
+	the sentiment is greater for one of the three
+	categories. MUTATING!
+	"""
+	df['dominant'] = ['bull' if bull == max(bull, neut, bear) else
+					  'bear' if bear == max(bull, neut, bear) else
+					  'neut' if neut == max(bull, neut, bear) else 'tie'
+					  for bull, neut, bear in zip(df['Bullish (%)'], df['Neutral (%)'], df['Bearish (%)'])]
+	# Reset the index
+	df.reset_index(drop=True, inplace=True)
+
+	for i in range(df.shape[0]):
+		if df.loc[i, 'dominant'] == 'bull':
+			df.loc[i, 'Bullish (%)'] = f'<b><span style="color:green">{df.loc[i, "Bullish (%)"]}</span></b>'
+		elif df.loc[i, 'dominant'] == 'bear':
+			df.loc[i, 'Bearish (%)'] = f'<b><span style="color:red">{df.loc[i, "Bearish (%)"]}</span></b>'
+		elif df.loc[i, 'dominant'] == 'neut':
+			df.loc[i, 'Neutral (%)'] = f'<b><span>{df.loc[i, "Neutral (%)"]}</span></b>'
+	df.drop('dominant', axis=1, inplace=True)
+
+def generate_stonks_report_df(df):
+	"""
+	Takes a df and returns the top 25 mentioned tickers and other relevant information.
+	Returns a df.
+	"""
+	df = df.sort_values('num_mentions', ascending=False).head(25)
+	
+	# Changing format of df for nicer display
+	df['Ticker'] = [f'<a href="{url}">{ticker}</a>' for ticker, url in zip(df['ticker'], df['url'])]
+	df['Mentions'] = [f'{num_mentions} mentions ({pct_mentions}% of all mentions)' for num_mentions, pct_mentions in zip(df['num_mentions'], df['pct_mentions'])]
+	df.rename({'bullish_pct': 'Bullish (%)', 'bearish_pct': 'Bearish (%)', 'neutral_pct': 'Neutral (%)',
+			   'price': 'Price', 'price_change_net': 'Price Change ($)', 'price_change_pct': 'Price Change (%)'},
+			   axis = 1, inplace = True)
+	df['Price Change ($)'] = df['Price Change ($)'].apply(change_text_color)
+	df['Price Change (%)'] = df['Price Change (%)'].apply(change_text_color)
+	find_dominant_sentiment(df)
+
+	return df[['Ticker', 'Mentions', 'Bullish (%)', 'Neutral (%)', 'Bearish (%)', 'Price', 'Price Change ($)', 'Price Change (%)']]
+
+def send_email(name, receiver_email, df, port = 587, smtp_server = "smtp.gmail.com"):
+	# smtp_server = "smtp.gmail.com:587"
+
+	# Load email credentials (need to make this json with your own credentials)
+	with open("email.json") as f:
+		email_creds = json.load(f)
+
+	sender_email = email_creds['login']['email']
+	password = email_creds['login']['password']
+
+	html = f"""
+	<html><body><p>Hello {name},</p>
+	<p>To help you YOLO your money away, here are the top 25 tickers (by number of mentions) within the past 24 hours from r/wallstreetbets along with daily price information and sentiment analysis percentages:</p>
+	<p>{df.to_html(col_space = 80, justify='center', index=False, render_links=True, escape=False)}</p>
+	<p>Check out my <a href="https://github.com/alex-baransky/wsbtickerbot">source code</a> for this project. You can also check out the original <a href="https://github.com/RyanElliott10/wsbtickerbot">source code</a> written by RyanElliott10 that I used to develop this project.</p>
+	<p>Good luck,</p>
+	<p>Senior Stonks</p>
+	<br>
+	<p><b>Disclaimer</b>: This data is collected for investigational purposes only and is intended to be used as a starting point for further exploration. I am not responsible for losses (or gains) you may realize as a result of this information. Invest at your own risk.<p>
+	</body></html>
+	"""
+
+	message = MIMEMultipart("alternative", None, [MIMEText(html,'html')])
+
+	message['Subject'] = f"Stonks Report - {get_date()}"
+	message['From'] = sender_email
+	message['To'] = receiver_email
+
+	with smtplib.SMTP(smtp_server, port) as server:
+		server.ehlo()
+		server.starttls()
+		server.login(sender_email, password)
+		server.sendmail(sender_email, receiver_email, message.as_string())
 
 class Ticker:
 	def __init__(self, ticker):
@@ -334,15 +429,28 @@ class Ticker:
 
 if __name__ == "__main__":
 	# USAGE: wsbtickerbot.py [ subreddit ] [ num_submissions ]
-	mode = 1
 	num_submissions = 500
 	sub = "wallstreetbets"
 
 	if len(sys.argv) > 2:
-		mode = 1
 		num_submissions = int(sys.argv[2])
 
 	start_time = datetime.now()
 	valid_symbols = get_valid_symbols()
-	run(mode, sub, num_submissions)
-	print(f'It took {(datetime.now() - start_time)/60} minutes to run!')
+	run(sub, num_submissions)
+	print(f'It took {(datetime.now() - start_time)} to run!')
+
+	print('Sending emails...')
+
+	# Get the list of names and emails to send the report to
+	stonks_email_df = get_stonks_email_df()
+	names = stonks_email_df.Name
+	emails = stonks_email_df.Email
+
+	# Load the report df
+	stonks_report_df = pd.read_csv(f'./data/{time.strftime("%Y%m%d")}-stonks.csv')
+	stonks_report_df = generate_stonks_report_df(stonks_report_df)
+	# stonks_report_df.to_csv('./test_df.csv', index=False)
+
+	for name, email in zip(names, emails):
+		send_email(name, email, stonks_report_df)

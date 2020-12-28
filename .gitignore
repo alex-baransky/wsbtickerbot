@@ -139,6 +139,9 @@ cython_debug/
 
 # Data
 *.csv
+*.txt
+/data
 
 # Credential Files
-config.json
+*.json
+*.pickle
