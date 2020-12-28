@@ -1,14 +1,13 @@
 from ftplib import FTP
+from datetime import datetime, timedelta
+from praw.models import MoreComments
+from bs4 import BeautifulSoup
 import re
 import sys
 import praw
 import time
 import json
-import pprint
 import operator
-from datetime import datetime, timedelta
-from praw.models import MoreComments
-from bs4 import BeautifulSoup
 import requests
 import pandas as pd
 import csv
