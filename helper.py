@@ -6,14 +6,15 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 import pandas as pd
 
+abs_path = '/home/pi/Desktop/Projects/wsbtickerbot/'
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 # The file token.pickle stores the user's access and refresh tokens, and is
 # created automatically when the authorization flow completes for the first
 # time.
 # token_path = '/path/to/token.pickle'
-token_path = r'./token.pickle'
+token_path = abs_path+'token.pickle'
 # credentials_path = '/path/to/credentials.json'
-credentials_path = r'./credentials.json'
+credentials_path = abs_path+'credentials.json'
 
 def create_service(mode):
 	creds = None
@@ -69,3 +70,4 @@ def get_stonks_email_df():
 
 	sheet = get_google_sheet(SPREADSHEET_ID, 'Emails')
 	return gsheet2df(sheet)
+	

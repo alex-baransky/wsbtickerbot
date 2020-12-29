@@ -17,8 +17,11 @@ import csv
 import smtplib
 import ssl
 
+# Set the path to the project directory
+abs_path = '/home/pi/Desktop/Projects/wsbtickerbot/'
+
 # to add the path for Python to search for files to use my edited version of vaderSentiment
-sys.path.insert(0, 'vaderSentiment/vaderSentiment')
+sys.path.insert(0, abs_path+'vaderSentiment/vaderSentiment')
 from vaderSentiment import SentimentIntensityAnalyzer
 
 blacklist_words = [
@@ -73,15 +76,15 @@ def get_valid_symbols():
 	nasdaq.cwd('SymbolDirectory')
 
 	# Write stock symbols to two files
-	with open('nasdaqlisted.txt', 'wb') as f:
+	with open(abs_path+'nasdaqlisted.txt', 'wb') as f:
 		nasdaq.retrbinary('RETR nasdaqlisted.txt', f.write)
-	with open('otherlisted.txt', 'wb') as f:
+	with open(abs_path+'otherlisted.txt', 'wb') as f:
 		nasdaq.retrbinary('RETR otherlisted.txt', f.write)
 
 	# Open files and merge them
-	with open('nasdaqlisted.txt', 'r') as f:
+	with open(abs_path+'nasdaqlisted.txt', 'r') as f:
 		total_stocks = f.readlines()
-	with open('otherlisted.txt', 'r') as f:
+	with open(abs_path+'otherlisted.txt', 'r') as f:
 		# Discard the header row
 		f.readline()
 		total_stocks.extend(f.readlines())
@@ -91,26 +94,6 @@ def get_valid_symbols():
 	valid_symbols = df['Symbol'][df['Symbol'].apply(str.isalpha)]
 	
 	return dict.fromkeys(list(valid_symbols), 1)
-
-def get_price_info(ticker):
-	"""
-	Given a ticker string, scrape the Yahoo ticker page to get the price,
-	price change (both net and percent), and time of last update.
-	"""
-	response = requests.get(f'https://finance.yahoo.com/quote/{ticker}?p={ticker}')
-	text = BeautifulSoup(response.text, 'html.parser')
-
-	exists = text.find('div', attrs={'class': 'D(ib) Mend(20px)'})
-
-	if not exists:
-		return None
-
-	prices = exists.find_all('span')
-	prices = [val.string for val in prices]
-
-	price_change_net, price_change_pct = prices[1].replace('(', '').replace(')', '').split()
-
-	return [prices[0], price_change_net, price_change_pct, prices[2]]
 
 def extract_ticker(body, start_index):
 	"""
@@ -183,7 +166,7 @@ def setup(sub):
 		sub = "wallstreetbets"
 
 	# Load Reddit API credentials (need to make this json with your own credentials)
-	with open("config.json") as json_data_file:
+	with open(abs_path+"config.json") as json_data_file:
 		data = json.load(json_data_file)
 
 	# create a reddit instance
@@ -238,7 +221,7 @@ def run(sub, num_submissions):
 
 	# Open csv file for saving and write header row
 	timestr = time.strftime("%Y%m%d")
-	csvfile = open(f'./data/{timestr}-stonks.csv', 'w', newline='', encoding='utf-8')
+	csvfile = open(abs_path+f'data/{timestr}-stonks.csv', 'w', newline='', encoding='utf-8')
 	csvwriter = csv.writer(csvfile)
 	csvwriter.writerow(['ticker', 'date', 'url', 'num_mentions', 'pct_mentions', 'pos_count',
 						'neg_count', 'bullish_pct', 'bearish_pct', 'neutral_pct', 'price', 'price_change_net',
@@ -339,7 +322,7 @@ def send_email(name, receiver_email, df, port = 587, smtp_server = "smtp.gmail.c
 	# smtp_server = "smtp.gmail.com:587"
 
 	# Load email credentials (need to make this json with your own credentials)
-	with open("email.json") as f:
+	with open(abs_path+"email.json") as f:
 		email_creds = json.load(f)
 
 	sender_email = email_creds['login']['email']
@@ -350,6 +333,7 @@ def send_email(name, receiver_email, df, port = 587, smtp_server = "smtp.gmail.c
 	<p>To help you YOLO your money away, here are the top 25 tickers (by number of mentions) within the past 24 hours from r/wallstreetbets along with daily price information and sentiment analysis percentages:</p>
 	<p>{df.to_html(col_space = 80, justify='center', index=False, render_links=True, escape=False)}</p>
 	<p>Check out my <a href="https://github.com/alex-baransky/wsbtickerbot">source code</a> for this project. You can also check out the original <a href="https://github.com/RyanElliott10/wsbtickerbot">source code</a> written by RyanElliott10 that I used to develop this project.</p>
+	<br>
 	<p>Good luck,</p>
 	<p>Senior Stonks</p>
 	<br>
@@ -448,9 +432,9 @@ if __name__ == "__main__":
 	emails = stonks_email_df.Email
 
 	# Load the report df
-	stonks_report_df = pd.read_csv(f'./data/{time.strftime("%Y%m%d")}-stonks.csv')
+	stonks_report_df = pd.read_csv(abs_path+f'data/{time.strftime("%Y%m%d")}-stonks.csv')
 	stonks_report_df = generate_stonks_report_df(stonks_report_df)
-	# stonks_report_df.to_csv('./test_df.csv', index=False)
 
 	for name, email in zip(names, emails):
 		send_email(name, email, stonks_report_df)
+		
