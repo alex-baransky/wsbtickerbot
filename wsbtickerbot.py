@@ -314,9 +314,9 @@ def generate_stonks_report_df(df):
                'price': 'Price', 'price_change_net': 'Price Change ($)', 'price_change_pct': 'Price Change (%)'},
                axis = 1, inplace = True)
     # Formats prices so they always display 2 decimal places
-    df['Price'] = df['Price'].astype(float).apply(lambda f: '$%.2f' % f)
-    df['Price Change ($)'] = df['Price Change ($)'].astype(float).apply(lambda f: '%.2f' % f).apply(change_text_color)
-    df['Price Change (%)'] = df['Price Change (%)'].apply(lambda s: s.replace('%',''))\
+    df['Price'] = df['Price'].apply(lambda f: str(f).replace(',', '')).astype(float).apply(lambda f: '$%.2f' % f)
+    df['Price Change ($)'] = df['Price Change ($)'].apply(lambda f: str(f).replace(',', '')).astype(float).apply(lambda f: '%.2f' % f).apply(change_text_color)
+    df['Price Change (%)'] = df['Price Change (%)'].apply(lambda f: str(f).replace('%','').replace(',', ''))\
                             .astype(float).apply(lambda f: ('%.2f' % f)+'%' if str(f)[0] == '-' else '+'+('%.2f' % f)+'%')\
                             .apply(change_text_color)
     find_dominant_sentiment(df)
@@ -439,7 +439,7 @@ if __name__ == "__main__":
     # Load the report df
     stonks_report_df = pd.read_csv(abs_path+f'data/{time.strftime("%Y%m%d")}-stonks.csv')
     stonks_report_df = generate_stonks_report_df(stonks_report_df)
-
+    
     for name, email in zip(names, emails):
         send_email(name, email, stonks_report_df)
         
