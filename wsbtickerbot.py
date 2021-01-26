@@ -37,7 +37,9 @@ blacklist_words = [
       "IPA", "URL", "MILF", "BUT", "SSN", "FIFA", "USD", "CPU", "AT",
       "GG", "ELON", "ROPE", "GAS", "P", "SEX", "GTFO", "BRK", "KAHOOT",
       "VHS", "HCFC", "VIX", "BECKY", "CELG", "NIOGANG", "URSELF", "HOLD",
-      "MOON", "EV", "PUMP"
+      "MOON", "EV", "PUMP", "EOD", "ARE", "FOR", "OPEN", "OR", "JUST",
+      "CAN", "ON", "GO", "AM", "NOW", "RE", "SO", "BIG", "OUT", "SEE",
+      "HAS"
     ]
 
 blacklist_words = dict.fromkeys(blacklist_words, 1)
