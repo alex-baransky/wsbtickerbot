@@ -39,7 +39,8 @@ blacklist_words = [
       "VHS", "HCFC", "VIX", "BECKY", "CELG", "NIOGANG", "URSELF", "HOLD",
       "MOON", "EV", "PUMP", "EOD", "ARE", "FOR", "OPEN", "OR", "JUST",
       "CAN", "ON", "GO", "AM", "NOW", "RE", "SO", "BIG", "OUT", "SEE",
-      "HAS"
+      "HAS", "MUST", "LOVE", "HE", "BY", "NEW", "ONE", "UK", "NEXT",
+      "FREE"
     ]
 
 blacklist_words = dict.fromkeys(blacklist_words, 1)
@@ -337,7 +338,8 @@ def send_email(name, receiver_email, df, port = 587, smtp_server = "smtp.gmail.c
 
     html = f"""
     <html><body><p>Hello {name},</p>
-    <p>To help you YOLO your money away, here are the top 25 tickers (by number of mentions) within the past 24 hours from r/wallstreetbets along with daily price information and sentiment analysis percentages:</p>
+    <p>To help you YOLO your money away, here are the top 25 tickers (by number of mentions) within the past 24 hours from r/wallstreetbets along with daily price information and sentiment analysis percentages.</p>
+    <p><b>If you believe a ticker shown in this table does not represent a stock, please respond to this email to let me know!</b></p>
     <p>{df.to_html(col_space = 80, justify='center', index=False, render_links=True, escape=False)}</p>
     <p>Check out my <a href="https://github.com/alex-baransky/wsbtickerbot">source code</a> for this project. You can also check out the original <a href="https://github.com/RyanElliott10/wsbtickerbot">source code</a> written by RyanElliott10 that I used to develop this project.</p>
     <br>
@@ -420,7 +422,7 @@ class Ticker:
 
 if __name__ == "__main__":
     # USAGE: wsbtickerbot.py [ subreddit ] [ num_submissions ]
-    num_submissions = 500
+    num_submissions = 2000
     sub = "wallstreetbets"
 
     if len(sys.argv) > 2:
