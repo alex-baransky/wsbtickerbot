@@ -40,7 +40,8 @@ blacklist_words = [
       "MOON", "EV", "PUMP", "EOD", "ARE", "FOR", "OPEN", "OR", "JUST",
       "CAN", "ON", "GO", "AM", "NOW", "RE", "SO", "BIG", "OUT", "SEE",
       "HAS", "MUST", "LOVE", "HE", "BY", "NEW", "ONE", "UK", "NEXT",
-      "FREE"
+      "FREE", "DUDE", "WANT", "VERY", "CUZ", "TWO", "PLAN", "CRY", "RIDE",
+      "WANT", "STAY", "VERY", "EVER", "ANY"
     ]
 
 blacklist_words = dict.fromkeys(blacklist_words, 1)
@@ -422,7 +423,7 @@ class Ticker:
 
 if __name__ == "__main__":
     # USAGE: wsbtickerbot.py [ subreddit ] [ num_submissions ]
-    num_submissions = 2000
+    num_submissions = 1000
     sub = "wallstreetbets"
 
     if len(sys.argv) > 2:
