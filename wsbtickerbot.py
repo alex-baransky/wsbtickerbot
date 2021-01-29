@@ -344,7 +344,7 @@ def send_email(name, receiver_email, df, port = 587, smtp_server = "smtp.gmail.c
     <p>Check out my <a href="https://github.com/alex-baransky/wsbtickerbot">source code</a> for this project. You can also check out the original <a href="https://github.com/RyanElliott10/wsbtickerbot">source code</a> written by RyanElliott10 that I used to develop this project.</p>
     <br>
     <p>Good luck,</p>
-    <p>Senior Stonks</p>
+    <p>Señor Stonks</p>
     <br>
     <p><b>Disclaimer</b>: This data is collected for investigational purposes only and is intended to be used as a starting point for further exploration. I am not responsible for losses (or gains) you may realize as a result of this information. Invest at your own risk.<p>
     </body></html>
