@@ -145,3 +145,5 @@ otherlisted.txt
 # Credential Files
 *.json
 *.pickle
+
+*.py~
