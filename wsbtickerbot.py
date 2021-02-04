@@ -41,7 +41,7 @@ blacklist_words = [
       "CAN", "ON", "GO", "AM", "NOW", "RE", "SO", "BIG", "OUT", "SEE",
       "HAS", "MUST", "LOVE", "HE", "BY", "NEW", "ONE", "UK", "NEXT",
       "FREE", "DUDE", "WANT", "VERY", "CUZ", "TWO", "PLAN", "CRY", "RIDE",
-      "WANT", "STAY", "VERY", "EVER", "ANY", "HUGE", "WELL", "GOOD"
+      "WANT", "STAY", "VERY", "EVER", "ANY", "HUGE", "WELL", "GOOD", "GIF"
     ]
 
 blacklist_words = dict.fromkeys(blacklist_words, 1)
