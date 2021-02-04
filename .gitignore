@@ -138,7 +138,6 @@ dmypy.json
 cython_debug/
 
 # Data
-*.csv
 nasdaqlisted.txt
 otherlisted.txt
 /data
